@@ -35,6 +35,11 @@ async fn home() -> (StatusCode, String) {
   )
 }
 
+/// matches [\w\d\-_]+
+fn is_valid_name(name: &str) -> bool {
+  name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+}
+
 async fn save_data(
   // this argument tells axum to parse the request body
   Path(name): Path<String>,
@@ -44,7 +49,11 @@ async fn save_data(
   let data = to_string_pretty(&payload).unwrap();
   println!("Data received for {}: {}", name, data);
 
-  let filename = generate_filename();
+  if !is_valid_name(&name) {
+    return (StatusCode::BAD_REQUEST, "Invalid name".to_string());
+  }
+
+  let filename = generate_filename(&name);
   let path = PathBuf::from(format!("data/{}", filename));
 
   // Create directory if it doesn't exist
@@ -61,12 +70,12 @@ async fn save_data(
 }
 
 // Generates a filename with date in the format YYYY-MM-DD.json
-fn generate_filename() -> String {
+fn generate_filename(name: &str) -> String {
   let now = SystemTime::now();
   let duration = now.duration_since(UNIX_EPOCH).unwrap();
   let seconds = duration.as_secs();
 
   let date = chrono::DateTime::from_timestamp(seconds as i64, 0).expect("Invalid timestamp");
 
-  format!("{}.json", date.format("%Y-%m-%d"))
+  format!("{}-{}.json", name, date.format("%Y-%m-%d"))
 }
