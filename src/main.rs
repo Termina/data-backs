@@ -1,4 +1,5 @@
 use axum::extract::ConnectInfo;
+use axum::http::HeaderMap;
 use axum::{
   extract::Path,
   http::StatusCode,
@@ -49,11 +50,16 @@ fn is_valid_name(name: &str) -> bool {
 async fn save_data(
   // this argument tells axum to parse the request body
   Path(name): Path<String>,
+  headers: HeaderMap,
   ConnectInfo(addr): ConnectInfo<SocketAddr>,
   // as JSON into a `Data` type
   Json(payload): Json<Value>,
 ) -> (StatusCode, String) {
   let data = to_string_pretty(&payload).unwrap();
+  let remote_addr = headers
+    .get("remote_addr")
+    .map(|addr| addr.to_str().unwrap_or("none"))
+    .unwrap_or("none");
 
   println!("Data received for {:?} {}: {}", addr, name, data.len());
 
@@ -61,7 +67,7 @@ async fn save_data(
     return (StatusCode::BAD_REQUEST, "Invalid name".to_string());
   }
 
-  let filename = generate_filename(&name, &addr.to_string());
+  let filename = generate_filename(&name, remote_addr);
   let current_dir = env::current_dir().unwrap();
   let path = PathBuf::from(format!("{}/data/{}", current_dir.display(), filename));
 
