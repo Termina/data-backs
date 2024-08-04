@@ -7,6 +7,8 @@ use axum::{
   Json, Router,
 };
 use core::net::SocketAddr;
+use tower_http::cors::CorsLayer;
+use tower_http::trace::TraceLayer;
 
 use serde_json::{json, to_string_pretty, Value};
 use std::{
@@ -23,7 +25,11 @@ async fn main() {
   tracing_subscriber::fmt::init();
 
   // build our application with a route
-  let app = Router::new().route("/", get(home)).route("/data/:name", post(save_data));
+  let app = Router::new()
+    .route("/", get(home))
+    .route("/data/:name", post(save_data))
+    .layer(CorsLayer::permissive())
+    .layer(TraceLayer::new_for_http());
   // read port from environment variable, defaults to 3000
   let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
 
