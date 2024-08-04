@@ -57,7 +57,7 @@ async fn save_data(
 ) -> (StatusCode, String) {
   let data = to_string_pretty(&payload).unwrap();
   let remote_addr = headers
-    .get("remote_addr")
+    .get("X-Forwarded-For")
     .map(|addr| addr.to_str().unwrap_or("none"))
     .unwrap_or("none");
 
