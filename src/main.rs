@@ -1,11 +1,13 @@
+use axum::extract::ConnectInfo;
 use axum::{
   extract::Path,
   http::StatusCode,
   routing::{get, post},
   Json, Router,
 };
+use core::net::SocketAddr;
 
-use serde_json::{to_string_pretty, Value};
+use serde_json::{json, to_string_pretty, Value};
 use std::{
   env,
   fs::File,
@@ -27,7 +29,9 @@ async fn main() {
   // run our app with hyper, listening globally on port 3000
   let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await.unwrap();
   println!("Listening on {}", listener.local_addr().unwrap());
-  axum::serve(listener, app).await.unwrap();
+  axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
+    .await
+    .unwrap();
 }
 
 async fn home() -> (StatusCode, String) {
@@ -45,17 +49,19 @@ fn is_valid_name(name: &str) -> bool {
 async fn save_data(
   // this argument tells axum to parse the request body
   Path(name): Path<String>,
+  ConnectInfo(addr): ConnectInfo<SocketAddr>,
   // as JSON into a `Data` type
   Json(payload): Json<Value>,
 ) -> (StatusCode, String) {
   let data = to_string_pretty(&payload).unwrap();
-  println!("Data received for {}: {}", name, data);
+
+  println!("Data received for {:?} {}: {}", addr, name, data.len());
 
   if !is_valid_name(&name) {
     return (StatusCode::BAD_REQUEST, "Invalid name".to_string());
   }
 
-  let filename = generate_filename(&name);
+  let filename = generate_filename(&name, &addr.to_string());
   let current_dir = env::current_dir().unwrap();
   let path = PathBuf::from(format!("{}/data/{}", current_dir.display(), filename));
 
@@ -69,16 +75,16 @@ async fn save_data(
 
   println!("Data saved to {}", filename);
 
-  (StatusCode::OK, format!("Data saved to: {}", path.display()))
+  (StatusCode::OK, json!({ "filename": filename }).to_string())
 }
 
 // Generates a filename with date in the format YYYY-MM-DD.json
-fn generate_filename(name: &str) -> String {
+fn generate_filename(name: &str, addr: &str) -> String {
   let now = SystemTime::now();
   let duration = now.duration_since(UNIX_EPOCH).unwrap();
   let seconds = duration.as_secs();
 
   let date = chrono::DateTime::from_timestamp(seconds as i64, 0).expect("Invalid timestamp");
 
-  format!("{}-{}.json", name, date.format("%Y-%m-%d"))
+  format!("{}-{}-{}.json", name, date.format("%Y-%m-%d"), addr.replace(['.', ':'], "_"))
 }
