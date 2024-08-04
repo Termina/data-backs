@@ -4,8 +4,10 @@ use axum::{
   routing::{get, post},
   Json, Router,
 };
+
 use serde_json::{to_string_pretty, Value};
 use std::{
+  env,
   fs::File,
   io::Write,
   path::PathBuf,
@@ -54,19 +56,20 @@ async fn save_data(
   }
 
   let filename = generate_filename(&name);
-  let path = PathBuf::from(format!("data/{}", filename));
+  let current_dir = env::current_dir().unwrap();
+  let path = PathBuf::from(format!("{}/data/{}", current_dir.display(), filename));
 
   // Create directory if it doesn't exist
   if !path.parent().unwrap().exists() {
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
   }
 
-  let mut file = File::create(path).unwrap();
+  let mut file = File::create(&path).unwrap();
   file.write_all(data.as_bytes()).unwrap();
 
   println!("Data saved to {}", filename);
 
-  (StatusCode::OK, "Data saved successfully".to_string())
+  (StatusCode::OK, format!("Data saved to: {}", path.display()))
 }
 
 // Generates a filename with date in the format YYYY-MM-DD.json
